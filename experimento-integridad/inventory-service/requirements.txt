@@ -1,0 +1,5 @@
+flask==3.*
+flask_sqlalchemy==3.*
+SQLAlchemy==2.*
+psycopg2-binary==2.*
+gunicorn==21.*

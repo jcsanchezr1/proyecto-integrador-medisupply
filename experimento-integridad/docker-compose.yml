@@ -1,0 +1,42 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_DB: inventorydb
+      POSTGRES_USER: inv_user
+      POSTGRES_PASSWORD: inv_pass
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inv_user -d inventorydb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  inventory:
+    build: ./inventory-service
+    container_name: ms_inventory
+    environment:
+      DATABASE_URL: postgresql+psycopg2://inv_user:inv_pass@db:5432/inventorydb
+      PORT: "8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+  validador:
+    build: ./cf-validador
+    container_name: ms_validator
+    environment:
+      INVENTORY_BASE_URL: http://inventory:8080
+      CHECKSUM_ALGO: sha256
+      CHECKSUM_HEADER: X-Message-Integrity
+      FORWARD_PATH: /inventory/products
+      PORT: "8081"
+    depends_on:
+      - inventory
+    ports:
+      - "8081:8081"
