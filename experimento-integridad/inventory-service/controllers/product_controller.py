@@ -1,6 +1,6 @@
 """
-Product controller for inventory-service component.
-Handles product-related business logic and operations.
+Controlador de productos para el componente inventory-service.
+Gestiona la lógica y operaciones relacionadas con los productos.
 """
 from datetime import date
 from typing import Dict, Any, Tuple, Optional
@@ -10,26 +10,26 @@ from models.product_model import Product, db
 
 
 class ProductController:
-    """Controller for handling product operations."""
+    """Gestiona las operaciones relacionadas con los productos."""
     
     def create_or_update_product(self) -> Tuple[Dict[str, Any], int]:
         """
-        Create a new product or update existing one.
+        Crea un nuevo producto o actualiza uno existente.
         
         Returns:
-            Tuple of (response_data, status_code)
+            Tuple de (response_data, status_code)
         """
-        # Check integrity validation header
+        # Verifica la integridad de la validación del header
         if request.headers.get("X-Integrity-Validated", "").lower() != "true":
             return {"error": "Integrity not validated"}, 403
         
-        # Parse request data
+        # Parsea los datos de la petición
         try:
             data = request.get_json(force=True)
         except Exception:
             return {"error": "Invalid JSON"}, 400
         
-        # Validate required fields
+        # Valida los campos requeridos
         is_valid, error_message = Product.validate_required_fields(data)
         if not is_valid:
             return {"error": error_message}, 400
@@ -39,17 +39,17 @@ class ProductController:
         lot_number = data.get("lot_number")
         expiration_str = data.get("expiration_date")
         
-        # Validate expiration date
+        # Valida la fecha de vencimiento
         exp_date, exp_error = Product.validate_expiration_date(expiration_str)
         if exp_error:
             return {"error": exp_error}, 400
         
         try:
-            # Check if product exists
+            # Verifica si el producto existe
             existing_product = Product.find_by_sku(sku)
             
             if existing_product:
-                # Update existing product
+                # Actualiza el producto existente
                 existing_product.update_product(name, lot_number, exp_date)
                 db.session.commit()
                 return {
@@ -57,7 +57,7 @@ class ProductController:
                     "product": existing_product.to_dict()
                 }, 200
             else:
-                # Create new product
+                # Crea un nuevo producto
                 new_product = Product.create_product(sku, name, lot_number, exp_date)
                 db.session.commit()
                 return {
@@ -71,13 +71,13 @@ class ProductController:
     
     def get_product_by_sku(self, sku: str) -> Tuple[Dict[str, Any], int]:
         """
-        Get product by SKU.
+        Obtiene un producto por SKU.
         
         Args:
             sku: Product SKU
             
         Returns:
-            Tuple of (response_data, status_code)
+            Tuple de (response_data, status_code)
         """
         try:
             product = Product.find_by_sku(sku)
@@ -91,10 +91,10 @@ class ProductController:
     
     def get_all_products(self) -> Tuple[Dict[str, Any], int]:
         """
-        Get all products.
+        Obtiene todos los productos.
         
         Returns:
-            Tuple of (response_data, status_code)
+            Tuple de (response_data, status_code)
         """
         try:
             products = Product.query.all()

@@ -27,20 +27,20 @@ class ValidationController:
         Returns:
             Tuple of (response_data, status_code)
         """
-        # Check for integrity header
+        # Verifica que el header de integridad este presente
         header_value = request.headers.get(self.checksum_header, "")
         if not header_value:
             logging.warning("Missing integrity header: %s", self.checksum_header)
             return {"error": f"Missing {self.checksum_header}"}, 400
         
-        # Extract expected checksum
+        # Extrae el checksum esperado
         expected_checksum = header_value.split("=", 1)[-1]  # supports "sha256=<hex>" or "<hex>"
         
-        # Get raw body
+        # Obtiene el raw body
         raw_body = request.get_data(cache=False, as_text=False)
         content_type = request.headers.get("Content-Type", "")
         
-        # Validate integrity
+        # Valida la integridad
         is_valid, actual_checksum, error_message = self.validation_model.validate_integrity(
             raw_body, content_type, expected_checksum
         )
@@ -52,7 +52,7 @@ class ValidationController:
                 "actual": actual_checksum
             }, 400
         
-        # If no inventory URL configured, return validation success only
+        # Si no hay URL de inventario configurada, retorna solo la validación de éxito
         if not self.inventory_base_url:
             logging.error("INVENTORY_BASE_URL not configured")
             return {
@@ -60,7 +60,7 @@ class ValidationController:
                 "note": "Validated only (no proxy). Set INVENTORY_BASE_URL to enable forwarding."
             }, 200
         
-        # Proxy to inventory service
+        # Proxy (envia la petición a través del proxy al servicio de inventario)
         return self._proxy_to_inventory(raw_body)
     
     def _proxy_to_inventory(self, raw_body: bytes) -> Tuple[Dict[str, Any], int]:
@@ -75,7 +75,7 @@ class ValidationController:
         """
         forward_url = self.inventory_base_url + self.forward_path
         
-        # Prepare headers (exclude integrity header, add validation marker)
+        # Prepara headers (prepara los headers para la petición)
         fwd_headers = {
             k: v for k, v in request.headers.items() 
             if k.lower() != self.checksum_header.lower()
@@ -85,14 +85,14 @@ class ValidationController:
         try:
             resp = requests.post(forward_url, data=raw_body, headers=fwd_headers, timeout=10)
             
-            # Create response with proper headers
+            # Crea la respuesta con los headers apropiados
             response_data = resp.content
             status_code = resp.status_code
             
-            # Create Flask response
+            # Crea la respuesta con Flask
             flask_response = make_response(response_data, status_code)
             
-            # Copy important headers
+            # Copia los headers importantes
             for k, v in resp.headers.items():
                 if k.lower() in ["content-type", "location"]:
                     flask_response.headers[k] = v

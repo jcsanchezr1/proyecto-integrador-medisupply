@@ -1,17 +1,17 @@
 """
-Product model for inventory-service component.
-Handles product data and business logic.
+Modelo de datos para el componente inventory-service.
+Gestiona los datos y lógica de negocio relacionados con los productos.
 """
 from datetime import datetime, date
 from typing import Dict, Any, Optional, List
 from flask_sqlalchemy import SQLAlchemy
 
-# This will be initialized in the main app
+# Esto será inicializado en la aplicación principal
 db = SQLAlchemy()
 
 
 class Product(db.Model):
-    """Product model representing inventory items."""
+    """Modelo de datos para representar los productos del inventario."""
     
     __tablename__ = "products"
     
@@ -23,7 +23,7 @@ class Product(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convert product to dictionary representation."""
+        """Convierte el producto a una representación de diccionario."""
         return {
             "id": self.id,
             "sku": self.sku,
@@ -35,13 +35,13 @@ class Product(db.Model):
     
     @classmethod
     def find_by_sku(cls, sku: str) -> Optional['Product']:
-        """Find product by SKU."""
+        """Encuentra un producto por SKU."""
         return cls.query.filter_by(sku=sku).first()
     
     @classmethod
     def create_product(cls, sku: str, name: str, lot_number: str = None, 
                       expiration_date: date = None) -> 'Product':
-        """Create a new product."""
+        """Crea un nuevo producto."""
         product = cls(
             sku=sku,
             name=name,
@@ -53,7 +53,7 @@ class Product(db.Model):
     
     def update_product(self, name: str, lot_number: str = None, 
                       expiration_date: date = None) -> None:
-        """Update product information."""
+        """Actualiza la información del producto."""
         self.name = name
         self.lot_number = lot_number
         self.expiration_date = expiration_date
@@ -61,13 +61,13 @@ class Product(db.Model):
     @staticmethod
     def validate_expiration_date(expiration_str: str) -> tuple[Optional[date], Optional[str]]:
         """
-        Validate expiration date string.
+        Valida la fecha de vencimiento.
         
         Args:
             expiration_str: Date string in YYYY-MM-DD format
             
         Returns:
-            Tuple of (date_object, error_message)
+            Tuple de (date_object, error_message)
         """
         if not expiration_str:
             return None, None
@@ -83,18 +83,18 @@ class Product(db.Model):
     @staticmethod
     def validate_required_fields(data: Dict[str, Any]) -> tuple[bool, Optional[str]]:
         """
-        Validate required fields for product creation.
+        Valida los campos requeridos para la creación de un producto.
         
         Args:
-            data: Product data dictionary
+            data: diccionario de datos del producto
             
         Returns:
-            Tuple of (is_valid, error_message)
+            Tuple de (is_valid, error_message)
         """
         sku = data.get("sku")
         name = data.get("name")
         
         if not sku or not name:
-            return False, "Missing required fields: sku, name"
+            return False, "Faltan campos requeridos: sku, name"
         
         return True, None

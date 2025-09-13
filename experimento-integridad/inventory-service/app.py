@@ -1,6 +1,6 @@
 """
-Main application entry point for inventory-service component.
-Uses MVC pattern with separate models, views, and controllers.
+Punto de entrada principal de la aplicación para el componente inventory-service.
+Usa el patrón MVC con modelos, vistas y controladores separados.
 """
 import os
 import logging
@@ -14,29 +14,29 @@ from views.response_view import ResponseView
 
 app = Flask(__name__)
 
-# Database configuration
+# Configuración de la base de datos
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///inventory.db")
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-# Initialize database
+# Inicializa la base de datos   
 db.init_app(app)
 
-# Initialize MVC components
+# Inicializa los componentes MVC
 product_controller = ProductController()
 health_controller = HealthController(db)
 response_view = ResponseView()
 
 @app.before_request
 def ensure_db():
-    """Create tables if missing (demo convenience)."""
+    """Crea las tablas si faltan (conveniencia de demostración)."""
     db.create_all()
 
 @app.route("/healthz", methods=["GET"])
 def health():
     """
-    Health check endpoint.
-    Uses MVC pattern to separate concerns.
+    Punto de comprobación de salud.
+    
     """
     try:
         response_data, status_code = health_controller.health_check()
@@ -52,8 +52,8 @@ def health():
 @app.route("/inventory/products", methods=["POST"])
 def create_product():
     """
-    Create or update product endpoint.
-    Uses MVC pattern to separate concerns.
+    Punto de creación o actualización de producto.
+    
     """
     try:
         response_data, status_code = product_controller.create_or_update_product()
@@ -69,8 +69,8 @@ def create_product():
 @app.route("/inventory/products/<sku>", methods=["GET"])
 def get_product(sku):
     """
-    Get product by SKU endpoint.
-    Uses MVC pattern to separate concerns.
+    Punto de obtención de producto por SKU.
+
     """
     try:
         response_data, status_code = product_controller.get_product_by_sku(sku)
@@ -86,8 +86,7 @@ def get_product(sku):
 @app.route("/inventory/products", methods=["GET"])
 def get_all_products():
     """
-    Get all products endpoint.
-    Uses MVC pattern to separate concerns.
+    Punto de obtención de todos los productos.    
     """
     try:
         response_data, status_code = product_controller.get_all_products()

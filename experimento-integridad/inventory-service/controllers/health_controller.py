@@ -1,26 +1,26 @@
 """
-Health controller for inventory-service component.
-Handles health check and system status operations.
+Controlador de salud para el componente inventory-service.
+Gestiona las operaciones de verificación de salud y estado del sistema.
 """
 from typing import Dict, Any, Tuple
 from flask_sqlalchemy import SQLAlchemy
 
 
 class HealthController:
-    """Controller for handling health check operations."""
+    """Gestiona las operaciones de verificación de salud."""
     
     def __init__(self, db: SQLAlchemy):
         self.db = db
     
     def health_check(self) -> Tuple[Dict[str, Any], int]:
         """
-        Perform health check.
+        Realiza la verificación de salud.
         
         Returns:
-            Tuple of (response_data, status_code)
+            Tuple de (response_data, status_code)
         """
         try:
-            # Test database connection
+            # Prueba la conexión a la base de datos
             self.db.session.execute('SELECT 1')
             
             return {

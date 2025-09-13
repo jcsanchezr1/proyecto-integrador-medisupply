@@ -1,0 +1,19 @@
+{
+	"info": {
+		"_postman_id": "e2b9b936-e4c9-4cde-8e6a-1b49e42b26ec",
+		"name": "experimento-integridad",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "34428112",
+		"_collection_link": "https://sergiocelis-5051674.postman.co/workspace/proyecto~d902d209-e2af-482f-a739-b54c970b73b7/collection/34428112-e2b9b936-e4c9-4cde-8e6a-1b49e42b26ec?action=share&source=collection_link&creator=34428112"
+	},
+	"item": [
+		{
+			"name": "Crear producto en inventario",
+			"request": {
+				"method": "GET",
+				"header": []
+			},
+			"response": []
+		}
+	]
+}

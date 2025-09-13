@@ -9,7 +9,6 @@ from typing import Tuple, Optional
 
 
 class ValidationModel:
-    """Model for handling validation logic and checksum computation."""
     
     def __init__(self, algorithm: str = "sha256"):
         self.algorithm = algorithm.lower()
@@ -18,7 +17,7 @@ class ValidationModel:
     
     def canonical_json_bytes(self, raw_body: bytes, content_type: str) -> bytes:
         """
-        Convert raw body to canonical JSON bytes for consistent checksum computation.
+        Convierte el raw body a bytes canónicos de JSON para el cálculo de checksum consistente.
         
         Args:
             raw_body: Raw request body bytes
@@ -38,13 +37,13 @@ class ValidationModel:
     
     def compute_checksum(self, raw_body: bytes) -> str:
         """
-        Compute checksum for the given raw body.
+        Calcula el checksum para el raw body dado.
         
         Args:
             raw_body: Raw bytes to compute checksum for
             
         Returns:
-            Hex digest of the checksum
+            Hex digest del checksum
         """
         h = hashlib.sha256()
         h.update(raw_body)
@@ -52,7 +51,7 @@ class ValidationModel:
     
     def validate_integrity(self, raw_body: bytes, content_type: str, expected_checksum: str) -> Tuple[bool, str, Optional[str]]:
         """
-        Validate the integrity of the request body.
+        Valida la integridad del body de la petición.
         
         Args:
             raw_body: Raw request body bytes
@@ -60,7 +59,7 @@ class ValidationModel:
             expected_checksum: Expected checksum from header
             
         Returns:
-            Tuple of (is_valid, actual_checksum, error_message)
+            Tuple de (is_valid, actual_checksum, error_message)
         """
         try:
             canonical_body = self.canonical_json_bytes(raw_body, content_type)
