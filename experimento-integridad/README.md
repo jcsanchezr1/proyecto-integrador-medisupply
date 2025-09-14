@@ -148,8 +148,7 @@ CHECKSUM=$(python -c "import json, hashlib; data=json.loads('$BODY'); canonical=
 curl -X POST "https://medi-supply-gw-212okt9m.uc.gateway.dev/inventory/products" \
   -H "Content-Type: application/json" \
   -H "X-Message-Integrity: sha256=$CHECKSUM" \
-  -H "x-api-key: AIzaSyCDrRbfQdf3AlHlLWypA4x8vqZQEOb1E9Y" \
-  -d "$BODY"
+    -d "$BODY"
 ```
 
 ### Headers Requeridos
