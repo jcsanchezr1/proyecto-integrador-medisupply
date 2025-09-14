@@ -78,7 +78,7 @@ gcloud run deploy inventory-service \
   --platform=managed \
   --allow-unauthenticated \
   --port=8080 \
-  --set-env-vars=DATABASE_URL=postgresql+psycopg2://inv_user:inv_pass@34.70.162.235:5432/inventorydb
+  --set-env-vars=DATABASE_URL=<DBRUL>
 ```
 
 ### 4. cf-validador (Cloud Function)
