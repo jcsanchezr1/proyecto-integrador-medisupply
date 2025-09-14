@@ -32,7 +32,7 @@ def ensure_db():
     """Crea las tablas si faltan (conveniencia de demostración)."""
     db.create_all()
 
-@app.route("/healthz", methods=["GET"])
+@app.route("/ping", methods=["GET"])
 def health():
     """
     Punto de comprobación de salud.

@@ -4,6 +4,7 @@ Gestiona las operaciones de verificación de salud y estado del sistema.
 """
 from typing import Dict, Any, Tuple
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
 
 
 class HealthController:
@@ -21,7 +22,7 @@ class HealthController:
         """
         try:
             # Prueba la conexión a la base de datos
-            self.db.session.execute('SELECT 1')
+            self.db.session.execute(text("SELECT 1"))
             
             return {
                 "status": "ok",
