@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import os
 import json
 import hashlib
@@ -16,17 +15,13 @@ CHECKSUM_HEADER = os.getenv("CHECKSUM_HEADER", "X-Message-Integrity")
 CHECKSUM_ALGO   = os.getenv("CHECKSUM_ALGO", "sha256").lower()
 HTTP_TIMEOUT    = float(os.getenv("HTTP_TIMEOUT_SEC", "10"))
 
-# No propagar (hop-by-hop) + cabeceras problemáticas para upstream
 HOP_BY_HOP = {
     "connection","keep-alive","proxy-authenticate","proxy-authorization",
     "te","trailers","transfer-encoding","upgrade"
 }
 STRIP_HEADERS = {
-    # <- principal causante del 404
     "host",
-    # que requests calcule estas
-    "content-length", "accept-encoding",
-    # rastro/infra CF que no se deben reenviar
+    "content-length", "accept-encoding",    
     "x-cloud-trace-context", "traceparent", "forwarded", "function-execution-id",
 }
 
@@ -70,18 +65,18 @@ def _forward_headers(req, skip_header: str) -> dict:
         if kl == skip_header.lower():
             continue
         out[k] = v
-    # Cabezal de defensa (requerido por Inventario)
+    
     out["X-Integrity-Validated"] = "true"
-    # Asegura Content-Type JSON hacia upstream
+    
     out["Content-Type"] = "application/json"
-    # Propaga correlación si llegó
+    
     if req.headers.get("X-Correlation-Id"):
         out["X-Correlation-Id"] = req.headers["X-Correlation-Id"]
     return out
 
 @functions_framework.http
 def validador_mediador(request):
-    # Preflight CORS
+    
     if request.method == "OPTIONS":
         return ("", 204, _cors_headers())
 
@@ -115,14 +110,7 @@ def validador_mediador(request):
     try:
         print(f"Forwarding to {url} with headers {headers} and body {raw_body!r}")
         resp = requests.post(url, data=raw_body, headers=headers, timeout=HTTP_TIMEOUT)
-
-        # Debug útil en logs
-        print(f"Upstream resolved URL: {resp.url}")
-        print(f"Response status from upstream: {resp.status_code}")
-        print(f"Response headers from upstream: {dict(resp.headers)}")
-        # (Ojo: si el body es grande o sensible, comenta la siguiente línea)
-        print(f"Response body from upstream: {resp.content!r}")
-
+      
         out_headers = {"Content-Type": resp.headers.get("Content-Type", "application/json"), **cors}
         if "Location" in resp.headers:
             out_headers["Location"] = resp.headers["Location"]
