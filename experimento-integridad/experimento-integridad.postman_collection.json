@@ -1,19 +1,654 @@
 {
 	"info": {
-		"_postman_id": "e2b9b936-e4c9-4cde-8e6a-1b49e42b26ec",
-		"name": "experimento-integridad",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_postman_id": "7816b157-d0eb-4615-b57a-6cc1de83355c",
+		"name": "MediSupply Integrity API (Simple)",
+		"description": "Colección de Postman simplificada para probar la API de MediSupply con validación de integridad",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json",
 		"_exporter_id": "34428112",
-		"_collection_link": "https://sergiocelis-5051674.postman.co/workspace/proyecto~d902d209-e2af-482f-a739-b54c970b73b7/collection/34428112-e2b9b936-e4c9-4cde-8e6a-1b49e42b26ec?action=share&source=collection_link&creator=34428112"
+		"_collection_link": "https://sergiocelis-5051674.postman.co/workspace/proyecto~d902d209-e2af-482f-a739-b54c970b73b7/collection/34428112-7816b157-d0eb-4615-b57a-6cc1de83355c?action=share&source=collection_link&creator=34428112"
 	},
 	"item": [
 		{
-			"name": "Crear producto en inventario",
+			"name": "1. Health Check - Inventory Service",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Response status code is 200\", function () {",
+							"    pm.expect(pm.response.code).to.equal(200);",
+							"});",
+							"",
+							"",
+							"pm.test(\"Response has required fields: database, service, and status\", function () {",
+							"    const responseData = pm.response.json();",
+							"    ",
+							"    pm.expect(responseData).to.be.an('object');",
+							"    pm.expect(responseData).to.have.all.keys('database', 'service', 'status');",
+							"});",
+							"",
+							"",
+							"pm.test(\"Response content type is application/json\", function () {",
+							"    pm.expect(pm.response.headers.get('Content-Type')).to.include(\"application/json\");",
+							"});",
+							"",
+							"",
+							"pm.test(\"The status field must be a non-empty string\", function () {",
+							"    const responseData = pm.response.json();",
+							"    ",
+							"    pm.expect(responseData).to.be.an('object');",
+							"    pm.expect(responseData.status).to.exist.and.to.be.a('string').and.to.have.lengthOf.at.least(1, \"Value should not be empty\");",
+							"});",
+							"",
+							"",
+							"pm.test(\"Response time is less than 200ms\", function () {",
+							"    pm.expect(pm.response.responseTime).to.be.below(200);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
 			"request": {
 				"method": "GET",
-				"header": []
+				"header": [],
+				"url": "{{inventory_service_url}}/ping",
+				"description": "Verifica que el servicio de inventario esté funcionando"
 			},
 			"response": []
+		},
+		{
+			"name": "2. Create Product - Direct Inventory Service",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// --- Pre-request: X-Message-Integrity (sha256 del JSON canónico) ---\r",
+							"\r",
+							"// 1) Toma el body RAW actual\r",
+							"let raw = pm.request.body && pm.request.body.raw ? pm.request.body.raw : \"\";\r",
+							"\r",
+							"// 2) Canonicaliza JSON: claves ordenadas, sin espacios\r",
+							"function sortKeysRec(o) {\r",
+							"  if (Array.isArray(o)) return o.map(sortKeysRec);\r",
+							"  if (o && typeof o === \"object\") {\r",
+							"    return Object.keys(o).sort().reduce((acc, k) => {\r",
+							"      acc[k] = sortKeysRec(o[k]);\r",
+							"      return acc;\r",
+							"    }, {});\r",
+							"  }\r",
+							"  return o;\r",
+							"}\r",
+							"\r",
+							"let canonical = raw;\r",
+							"try {\r",
+							"  const parsed = JSON.parse(raw);\r",
+							"  const sorted  = sortKeysRec(parsed);\r",
+							"  canonical = JSON.stringify(sorted); // sin espacios\r",
+							"} catch (e) {\r",
+							"  // Si no es JSON válido, usamos el body tal cual (pero tu backend espera JSON)\r",
+							"}\r",
+							"\r",
+							"// 3) Calcula SHA-256 (CryptoJS viene con Postman)\r",
+							"const hashHex = CryptoJS.SHA256(CryptoJS.enc.Utf8.parse(canonical))\r",
+							"  .toString(CryptoJS.enc.Hex);\r",
+							"\r",
+							"// 4) Inyecta headers\r",
+							"pm.request.headers.upsert({ key: \"X-Message-Integrity\", value: \"sha256=\" + hashHex });\r",
+							"pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });\r",
+							"\r",
+							"// 5) (Opcional) Variables para debug\r",
+							"pm.environment.set(\"last_canonical_body\", canonical);\r",
+							"pm.environment.set(\"last_checksum\", hashHex);\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Response status code is 200\", function () {",
+							"    pm.expect(pm.response.code).to.eql(200);",
+							"});",
+							"",
+							"",
+							"pm.test(\"Validate the product object structure\", function () {",
+							"    const responseData = pm.response.json();",
+							"    ",
+							"    pm.expect(responseData).to.be.an('object');",
+							"    pm.expect(responseData.product).to.be.an('object').that.includes.all.keys('created_at', 'expiration_date', 'id', 'lot_number', 'name', 'sku');",
+							"    pm.expect(responseData.status).to.be.a('string');",
+							"    ",
+							"    pm.expect(responseData.product.created_at).to.be.a('string');",
+							"    pm.expect(responseData.product.expiration_date).to.be.a('string');",
+							"    pm.expect(responseData.product.id).to.be.a('number');",
+							"    pm.expect(responseData.product.lot_number).to.be.a('string');",
+							"    pm.expect(responseData.product.name).to.be.a('string');",
+							"    pm.expect(responseData.product.sku).to.be.a('string');",
+							"});",
+							"",
+							"",
+							"pm.test(\"Expiration date must be in a valid date format\", function () {",
+							"    const responseData = pm.response.json();",
+							"    ",
+							"    pm.expect(responseData).to.be.an('object');",
+							"    pm.expect(responseData.product).to.exist;",
+							"    pm.expect(responseData.product.expiration_date).to.exist;",
+							"",
+							"    // Check if the expiration_date is in a valid date format",
+							"    const expirationDate = new Date(responseData.product.expiration_date);",
+							"    pm.expect(expirationDate.getTime()).to.not.be.NaN;",
+							"});",
+							"",
+							"",
+							"pm.test(\"SKU must be a non-empty string\", function () {",
+							"    const responseData = pm.response.json();",
+							"    ",
+							"    pm.expect(responseData).to.be.an('object');",
+							"    pm.expect(responseData.product).to.exist;",
+							"    pm.expect(responseData.product.sku).to.exist.and.to.be.a('string').and.to.have.lengthOf.at.least(1, \"SKU should not be empty\");",
+							"});",
+							"",
+							"",
+							"pm.test(\"Status is a non-empty string\", function () {",
+							"    const responseData = pm.response.json();",
+							"    ",
+							"    pm.expect(responseData).to.have.property('status').that.is.a('string').and.to.have.lengthOf.at.least(1, \"Value should not be empty\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "X-Integrity-Validated",
+						"value": "true"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"sku\": \"MED-001\",\n  \"name\": \"Aspirin 100mg\",\n  \"lot_number\": \"LOT123456\",\n  \"expiration_date\": \"2025-12-31\"\n}"
+				},
+				"url": "{{inventory_service_url}}/inventory/products",
+				"description": "Crea un producto directamente en el servicio de inventario (sin validación de integridad)"
+			},
+			"response": []
+		},
+		{
+			"name": "3. Get All Products - Direct Inventory Service",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Response status code is 200\", function () {",
+							"    pm.expect(pm.response.code).to.eql(200);",
+							"});",
+							"",
+							"",
+							"pm.test(\"Response has the required fields - count and products\", function () {",
+							"    const responseData = pm.response.json();",
+							"    ",
+							"    pm.expect(responseData).to.be.an('object');",
+							"    pm.expect(responseData).to.have.all.keys('count', 'products');",
+							"});",
+							"",
+							"",
+							"pm.test(\"Products is an array containing valid product objects\", function () {",
+							"    const responseData = pm.response.json();",
+							"    ",
+							"    pm.expect(responseData).to.be.an('object');",
+							"    pm.expect(responseData.products).to.be.an('array');",
+							"",
+							"    responseData.products.forEach(function(product) {",
+							"        pm.expect(product).to.be.an('object');",
+							"        pm.expect(product).to.have.all.keys('created_at', 'expiration_date', 'id', 'lot_number', 'name', 'sku');",
+							"        pm.expect(product.created_at).to.be.a('string');",
+							"        pm.expect(product.expiration_date).to.be.a('string');",
+							"        pm.expect(product.id).to.be.a('number');",
+							"        pm.expect(product.lot_number).to.be.a('string');",
+							"        pm.expect(product.name).to.be.a('string');",
+							"        pm.expect(product.sku).to.be.a('string');",
+							"    });",
+							"});",
+							"",
+							"",
+							"pm.test(\"Verify 'id' is a non-negative integer and 'sku' is a non-empty string\", function () {",
+							"    const responseData = pm.response.json();",
+							"    ",
+							"    pm.expect(responseData).to.be.an('object');",
+							"    pm.expect(responseData.products).to.be.an('array');",
+							"",
+							"    responseData.products.forEach(product => {",
+							"        pm.expect(product.id).to.be.a('number').and.to.be.at.least(0, \"id should be a non-negative integer\");",
+							"        pm.expect(product.sku).to.be.a('string').and.to.have.lengthOf.at.least(1, \"sku should not be empty\");",
+							"    });",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": "{{inventory_service_url}}/inventory/products",
+				"description": "Obtiene todos los productos del servicio de inventario"
+			},
+			"response": []
+		},
+		{
+			"name": "4. Validate and Create Product - Cloud Function",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Response status code is 200\", function () {",
+							"    pm.expect(pm.response.code).to.equal(200);",
+							"});",
+							"",
+							"",
+							"pm.test(\"Response has required fields\", function () {",
+							"    const responseData = pm.response.json();",
+							"    ",
+							"    pm.expect(responseData).to.be.an('object');",
+							"    pm.expect(responseData).to.have.all.keys('product', 'status');",
+							"});",
+							"",
+							"",
+							"pm.test(\"Expiration date is in a valid date format\", function () {",
+							"    const responseData = pm.response.json();",
+							"    pm.expect(responseData).to.be.an('object');",
+							"    ",
+							"    const expirationDate = responseData.product.expiration_date;",
+							"    pm.expect(expirationDate).to.exist;",
+							"    ",
+							"    // Regular expression to check for valid date format (YYYY-MM-DD)",
+							"    const dateFormat = /^\\d{4}-\\d{2}-\\d{2}$/;",
+							"    pm.expect(expirationDate).to.match(dateFormat, \"Expiration date format should be YYYY-MM-DD\");",
+							"});",
+							"",
+							"",
+							"pm.test(\"Product ID is a non-negative integer\", function () {",
+							"    const responseData = pm.response.json();",
+							"    ",
+							"    pm.expect(responseData).to.have.property('product');",
+							"    pm.expect(responseData.product).to.have.property('id');",
+							"    pm.expect(responseData.product.id).to.be.a('number').and.to.be.at.least(0);",
+							"});",
+							"",
+							"",
+							"pm.test(\"The lot number must be a non-empty string\", function () {",
+							"    const responseData = pm.response.json();",
+							"    ",
+							"    pm.expect(responseData).to.be.an('object');",
+							"    pm.expect(responseData.product).to.exist;",
+							"    pm.expect(responseData.product.lot_number).to.exist.and.to.be.a('string').and.to.have.lengthOf.at.least(1, \"Lot number should not be empty\");",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// --- Pre-request: X-Message-Integrity (sha256 del JSON canónico) ---\r",
+							"\r",
+							"// 1) Toma el body RAW actual\r",
+							"let raw = pm.request.body && pm.request.body.raw ? pm.request.body.raw : \"\";\r",
+							"\r",
+							"// 2) Canonicaliza JSON: claves ordenadas, sin espacios\r",
+							"function sortKeysRec(o) {\r",
+							"  if (Array.isArray(o)) return o.map(sortKeysRec);\r",
+							"  if (o && typeof o === \"object\") {\r",
+							"    return Object.keys(o).sort().reduce((acc, k) => {\r",
+							"      acc[k] = sortKeysRec(o[k]);\r",
+							"      return acc;\r",
+							"    }, {});\r",
+							"  }\r",
+							"  return o;\r",
+							"}\r",
+							"\r",
+							"let canonical = raw;\r",
+							"try {\r",
+							"  const parsed = JSON.parse(raw);\r",
+							"  const sorted  = sortKeysRec(parsed);\r",
+							"  canonical = JSON.stringify(sorted); // sin espacios\r",
+							"} catch (e) {\r",
+							"  // Si no es JSON válido, usamos el body tal cual (pero tu backend espera JSON)\r",
+							"}\r",
+							"\r",
+							"// 3) Calcula SHA-256 (CryptoJS viene con Postman)\r",
+							"const hashHex = CryptoJS.SHA256(CryptoJS.enc.Utf8.parse(canonical))\r",
+							"  .toString(CryptoJS.enc.Hex);\r",
+							"\r",
+							"// 4) Inyecta headers\r",
+							"pm.request.headers.upsert({ key: \"X-Message-Integrity\", value: \"sha256=\" + hashHex });\r",
+							"pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });\r",
+							"\r",
+							"// 5) (Opcional) Variables para debug\r",
+							"pm.environment.set(\"last_canonical_body\", canonical);\r",
+							"pm.environment.set(\"last_checksum\", hashHex);\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "X-Message-Integrity",
+						"value": "sha256=1964a6fa27025ec7668181032c1fafce7b503825a88af6483a79cd104e60da4b"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"sku\": \"MED-011\",\n    \"name\": \"Paracetamol 500mg\",\n    \"lot_number\": \"LOT345678\",\n    \"expiration_date\": \"2025-10-15\"\n}"
+				},
+				"url": "{{cloud_function_url}}",
+				"description": "Crea un producto a través del Cloud Function. IMPORTANTE: Calcula el checksum manualmente usando calculate-checksum.py"
+			},
+			"response": []
+		},
+		{
+			"name": "5. Create Product - API Gateway",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Response status code is 200\", function () {",
+							"    pm.expect(pm.response.code).to.eql(200);",
+							"});",
+							"",
+							"",
+							"pm.test(\"Response contains required fields\", function () {",
+							"    const responseData = pm.response.json();",
+							"    ",
+							"    pm.expect(responseData).to.be.an('object');",
+							"    pm.expect(responseData.product).to.exist;",
+							"    pm.expect(responseData.product.created_at).to.exist;",
+							"    pm.expect(responseData.product.expiration_date).to.exist;",
+							"    pm.expect(responseData.product.id).to.exist;",
+							"    pm.expect(responseData.product.lot_number).to.exist;",
+							"    pm.expect(responseData.product.name).to.exist;",
+							"    pm.expect(responseData.product.sku).to.exist;",
+							"    pm.expect(responseData.status).to.exist;",
+							"});",
+							"",
+							"",
+							"pm.test(\"Expiration date is in a valid date format\", function () {",
+							"    const responseData = pm.response.json();",
+							"    ",
+							"    pm.expect(responseData).to.be.an('object');",
+							"    pm.expect(responseData.product).to.exist;",
+							"    ",
+							"    const expirationDate = responseData.product.expiration_date;",
+							"    pm.expect(expirationDate).to.exist.and.to.match(/^\\d{4}-\\d{2}-\\d{2}$/, \"Expiration date should be in YYYY-MM-DD format\");",
+							"});",
+							"",
+							"",
+							"pm.test(\"ID must be a positive integer\", function () {",
+							"    const responseData = pm.response.json();",
+							"",
+							"    pm.expect(responseData).to.be.an('object');",
+							"    pm.expect(responseData.product).to.exist;",
+							"    pm.expect(responseData.product.id).to.be.a('number').and.to.be.above(0);",
+							"});",
+							"",
+							"",
+							"pm.test(\"Name and SKU must be non-empty strings\", function () {",
+							"    const responseData = pm.response.json();",
+							"",
+							"    pm.expect(responseData).to.be.an('object');",
+							"    pm.expect(responseData.product).to.exist;",
+							"",
+							"    pm.expect(responseData.product.name).to.exist.and.to.be.a('string').and.to.have.lengthOf.at.least(1, \"Name should not be empty\");",
+							"    pm.expect(responseData.product.sku).to.exist.and.to.be.a('string').and.to.have.lengthOf.at.least(1, \"SKU should not be empty\");",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// --- Pre-request: X-Message-Integrity (sha256 del JSON canónico) ---\r",
+							"\r",
+							"// 1) Toma el body RAW actual\r",
+							"let raw = pm.request.body && pm.request.body.raw ? pm.request.body.raw : \"\";\r",
+							"\r",
+							"// 2) Canonicaliza JSON: claves ordenadas, sin espacios\r",
+							"function sortKeysRec(o) {\r",
+							"  if (Array.isArray(o)) return o.map(sortKeysRec);\r",
+							"  if (o && typeof o === \"object\") {\r",
+							"    return Object.keys(o).sort().reduce((acc, k) => {\r",
+							"      acc[k] = sortKeysRec(o[k]);\r",
+							"      return acc;\r",
+							"    }, {});\r",
+							"  }\r",
+							"  return o;\r",
+							"}\r",
+							"\r",
+							"let canonical = raw;\r",
+							"try {\r",
+							"  const parsed = JSON.parse(raw);\r",
+							"  const sorted  = sortKeysRec(parsed);\r",
+							"  canonical = JSON.stringify(sorted); // sin espacios\r",
+							"} catch (e) {\r",
+							"  // Si no es JSON válido, usamos el body tal cual (pero tu backend espera JSON)\r",
+							"}\r",
+							"\r",
+							"// 3) Calcula SHA-256 (CryptoJS viene con Postman)\r",
+							"const hashHex = CryptoJS.SHA256(CryptoJS.enc.Utf8.parse(canonical))\r",
+							"  .toString(CryptoJS.enc.Hex);\r",
+							"\r",
+							"// 4) Inyecta headers\r",
+							"pm.request.headers.upsert({ key: \"X-Message-Integrity\", value: \"sha256=\" + hashHex });\r",
+							"pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });\r",
+							"\r",
+							"// 5) (Opcional) Variables para debug\r",
+							"pm.environment.set(\"last_canonical_body\", canonical);\r",
+							"pm.environment.set(\"last_checksum\", hashHex);\r",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "X-Message-Integrity",
+						"value": "sha256=304d5909c6c6579e2ac3622bf05b0b51abb119be327f068d9861d9cc8f228f5d"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"sku\": \"MED-003\",\n  \"name\": \"Paracetamol 500mg\",\n  \"lot_number\": \"LOT345678\",\n  \"expiration_date\": \"2025-10-15\"\n}"
+				},
+				"url": "{{api_gateway_url}}/inventory/products",
+				"description": "Crea un producto a través del API Gateway. IMPORTANTE: Calcula el checksum manualmente usando calculate-checksum.py"
+			},
+			"response": []
+		},
+		{
+			"name": "6. Create Product - API Gateway (Missing Checksum)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Response status code is 400\", function () {",
+							"    pm.expect(pm.response.code).to.equal(400);",
+							"});",
+							"",
+							"",
+							"pm.test(\"Response contains an error field\", function () {",
+							"    const responseData = pm.response.json();",
+							"    ",
+							"    pm.expect(responseData).to.be.an('object');",
+							"    pm.expect(responseData).to.have.property('error');",
+							"});",
+							"",
+							"",
+							"pm.test(\"Error field is a non-empty string\", function () {",
+							"    const responseData = pm.response.json();",
+							"    ",
+							"    pm.expect(responseData).to.be.an('object');",
+							"    pm.expect(responseData.error).to.exist.and.to.be.a('string').and.to.have.lengthOf.at.least(1, \"Error field should not be empty\");",
+							"});",
+							"",
+							"",
+							"pm.test(\"Response Content-Type is application/json\", function () {",
+							"    pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+							"});",
+							"",
+							"",
+							"pm.test(\"Response time is less than 200ms\", function () {",
+							"    pm.expect(pm.response.responseTime).to.be.below(200);",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"sku\": \"MED-004\",\n  \"name\": \"Product Without Checksum\",\n  \"lot_number\": \"LOT999999\",\n  \"expiration_date\": \"2025-09-30\"\n}"
+				},
+				"url": "{{api_gateway_url}}/inventory/products",
+				"description": "Intenta crear un producto sin checksum (debe fallar con error 400)"
+			},
+			"response": []
+		},
+		{
+			"name": "7. Create Product - API Gateway (Invalid Checksum)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Response status code is 400\", function () {",
+							"    pm.expect(pm.response.code).to.eql(400);",
+							"});",
+							"",
+							"",
+							"pm.test(\"Response contains an error message\", function () {",
+							"    const responseData = pm.response.json();",
+							"    ",
+							"    pm.expect(responseData).to.be.an('object');",
+							"    pm.expect(responseData).to.have.property('error').that.is.a('string').and.is.not.empty;",
+							"});",
+							"",
+							"",
+							"pm.test(\"Expected and Actual fields are present in the response\", function () {",
+							"    const responseData = pm.response.json();",
+							"    ",
+							"    pm.expect(responseData).to.be.an('object');",
+							"    pm.expect(responseData).to.have.all.keys('error', 'expected', 'actual');",
+							"    pm.expect(responseData.expected).to.exist;",
+							"    pm.expect(responseData.actual).to.exist;",
+							"});",
+							"",
+							"",
+							"pm.test(\"Error message must be a non-empty string\", function () {",
+							"    const responseData = pm.response.json();",
+							"    ",
+							"    pm.expect(responseData).to.have.property('error').that.is.a('string').and.to.have.lengthOf.at.least(1, \"Error message should not be empty\");",
+							"});",
+							"",
+							"",
+							"pm.test(\"Response time is less than 200ms\", function () {",
+							"    pm.expect(pm.response.responseTime).to.be.below(200);",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "X-Message-Integrity",
+						"value": "sha256=invalid_checksum_12345"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"sku\": \"MED-005\",\n  \"name\": \"Product With Invalid Checksum\",\n  \"lot_number\": \"LOT888888\",\n  \"expiration_date\": \"2025-08-20\"\n}"
+				},
+				"url": "{{api_gateway_url}}/inventory/products",
+				"description": "Intenta crear un producto con checksum inválido (debe fallar con error 400)"
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
 		}
 	]
 }

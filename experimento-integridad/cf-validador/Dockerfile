@@ -5,7 +5,5 @@ ENV PYTHONUNBUFFERED=1
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY main.py .
-COPY models/ ./models/
-COPY controllers/ ./controllers/
-COPY views/ ./views/
-CMD [ "functions-framework", "--target=validate_and_proxy_function", "--port=8081" ]
+CMD ["functions-framework", "--target=validador_mediador", "--port=8080"]
+

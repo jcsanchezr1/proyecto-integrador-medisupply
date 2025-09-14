@@ -1,46 +1,27 @@
-openapi: 3.0.0
+swagger: '2.0'
 info:
   title: MediSupply Integrity Gateway
-  version: 1.0.0
-servers:
-  - url: https://{GATEWAY_ID}-{REGION}.gateway.dev
-    variables:
-      GATEWAY_ID:
-        default: medi-supply-gw
-      REGION:
-        default: us-central1
+  version: '1.0.0'
+schemes: [https]
+consumes: [application/json]
+produces: [application/json]
 
 paths:
   /inventory/products:
     post:
-      summary: Create or update a product (via checksum validator proxy)
+      summary: Validate checksum via Cloud Function and forward (inside Function)
       operationId: postInventoryProducts
       x-google-backend:
-        address: https://REGION-PROJECT_ID.cloudfunctions.net/CF_NAME
-        path_translation: APPEND_PATH_TO_ADDRESS
-      security:
-        - api_key: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
+        address: https://us-central1-proyecto-integrador-medisupply.cloudfunctions.net/validador-checksum
+        path_translation: CONSTANT_ADDRESS   # <- clave: NO anexar /inventory/products
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema: { type: object }
       responses:
-        '201':
-          description: Created
-        '200':
-          description: Updated
-        '400':
-          description: Integrity or validation error
-        '403':
-          description: Integrity not validated
-        '502':
-          description: Upstream error
-
-components:
-  securitySchemes:
-    api_key:
-      type: apiKey
-      name: x-api-key
-      in: header
+        '201': { description: Created }
+        '200': { description: Updated }
+        '400': { description: Integrity or validation error }
+        '403': { description: Integrity not validated }
+        '502': { description: Upstream error }

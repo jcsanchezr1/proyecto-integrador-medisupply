@@ -1,60 +1,134 @@
-"""
-Main application entry point for cf-validador component.
-Uses MVC pattern with separate models, views, and controllers.
-Compatible with Google Cloud Functions Framework.
-"""
+# -*- coding: utf-8 -*-
 import os
+import json
+import hashlib
 import logging
-from flask import Flask, request
+import requests
+import functions_framework
 
-from controllers.validation_controller import ValidationController
-from views.response_view import ResponseView
+# ===== Config =====
+INVENTORY_BASE_URL = os.getenv(
+    "INVENTORY_BASE_URL",
+    "https://inventory-service-159067324714.us-central1.run.app"
+).rstrip("/")
+FORWARD_PATH    = os.getenv("FORWARD_PATH", "/inventory/products")
+CHECKSUM_HEADER = os.getenv("CHECKSUM_HEADER", "X-Message-Integrity")
+CHECKSUM_ALGO   = os.getenv("CHECKSUM_ALGO", "sha256").lower()
+HTTP_TIMEOUT    = float(os.getenv("HTTP_TIMEOUT_SEC", "10"))
 
-# Cloud Function (Gen2) using functions_framework via Flask app "app" as entrypoint.
-app = Flask(__name__)
+# No propagar (hop-by-hop) + cabeceras problemáticas para upstream
+HOP_BY_HOP = {
+    "connection","keep-alive","proxy-authenticate","proxy-authorization",
+    "te","trailers","transfer-encoding","upgrade"
+}
+STRIP_HEADERS = {
+    # <- principal causante del 404
+    "host",
+    # que requests calcule estas
+    "content-length", "accept-encoding",
+    # rastro/infra CF que no se deben reenviar
+    "x-cloud-trace-context", "traceparent", "forwarded", "function-execution-id",
+}
 
-# Initialize MVC components
-validation_controller = ValidationController()
-response_view = ResponseView()
+def _cors_headers() -> dict:
+    return {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type, X-Message-Integrity, X-Correlation-Id",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Max-Age": "3600",
+    }
 
-@app.route("/", methods=["POST"])
-def validate_and_proxy():
-    """
-    Main endpoint for validation and proxy functionality.
-    Uses MVC pattern to separate concerns.
-    """
+def _canonical_json_bytes(raw_body: bytes, content_type: str) -> bytes:
+    """Si es JSON, serializa de forma canónica (keys ordenadas, sin espacios)."""
+    if "application/json" in (content_type or "").lower():
+        try:
+            data = json.loads(raw_body.decode("utf-8"))
+            canon = json.dumps(data, separators=(",", ":"), sort_keys=True, ensure_ascii=False)
+            return canon.encode("utf-8")
+        except Exception:
+            return raw_body
+    return raw_body
+
+def _compute_checksum(raw: bytes) -> str:
+    if CHECKSUM_ALGO != "sha256":
+        raise ValueError("Unsupported algorithm; only sha256 is supported.")
+    h = hashlib.sha256()
+    h.update(raw)
+    return h.hexdigest()
+
+def _expected_from_header(v: str) -> str:
+    # Acepta "sha256=<hex>" o "<hex>"
+    return (v or "").split("=", 1)[-1].strip()
+
+def _forward_headers(req, skip_header: str) -> dict:
+    """Copia headers útiles, elimina hop-by-hop + problemáticos + header de integridad."""
+    out = {}
+    for k, v in req.headers.items():
+        kl = k.lower()
+        if kl in HOP_BY_HOP or kl in STRIP_HEADERS:
+            continue
+        if kl == skip_header.lower():
+            continue
+        out[k] = v
+    # Cabezal de defensa (requerido por Inventario)
+    out["X-Integrity-Validated"] = "true"
+    # Asegura Content-Type JSON hacia upstream
+    out["Content-Type"] = "application/json"
+    # Propaga correlación si llegó
+    if req.headers.get("X-Correlation-Id"):
+        out["X-Correlation-Id"] = req.headers["X-Correlation-Id"]
+    return out
+
+@functions_framework.http
+def validador_mediador(request):
+    # Preflight CORS
+    if request.method == "OPTIONS":
+        return ("", 204, _cors_headers())
+
+    cors = {"Access-Control-Allow-Origin": "*"}
+
+    # 1) Header de integridad
+    header_val = request.headers.get(CHECKSUM_HEADER, "")
+    if not header_val:
+        body = {"error": f"Missing {CHECKSUM_HEADER}"}
+        return (json.dumps(body), 400, {"Content-Type": "application/json", **cors})
+
+    expected = _expected_from_header(header_val)
+
+    # 2) Checksum del body canónico
+    raw_body = request.get_data(cache=False, as_text=False)
+    content_type = request.headers.get("Content-Type", "")
+    actual = _compute_checksum(_canonical_json_bytes(raw_body, content_type))
+
+    if actual != expected:
+        body = {"error": "Integrity check failed", "expected": expected, "actual": actual}
+        return (json.dumps(body), 400, {"Content-Type": "application/json", **cors})
+
+    # 3) Reenviar al servicio de inventario
+    if not INVENTORY_BASE_URL:
+        body = {"status": "ok", "note": "Validated only (no proxy). Set INVENTORY_BASE_URL."}
+        return (json.dumps(body), 200, {"Content-Type": "application/json", **cors})
+
+    url = INVENTORY_BASE_URL + FORWARD_PATH
+    headers = _forward_headers(request, CHECKSUM_HEADER)
+
     try:
-        # Use controller to handle business logic
-        response_data, status_code = validation_controller.validate_and_proxy()
-        
-        # Use view to format response
-        return response_view.create_response(response_data, status_code)
-        
-    except Exception as e:
-        logging.exception("Unexpected error in validate_and_proxy")
-        error_response = response_view.format_error_response(
-            "Internal server error", 
-            detail=str(e)
-        )
-        return response_view.create_response(error_response, 500)
+        print(f"Forwarding to {url} with headers {headers} and body {raw_body!r}")
+        resp = requests.post(url, data=raw_body, headers=headers, timeout=HTTP_TIMEOUT)
 
-# Cloud Function entry point - simplified approach
-def validate_and_proxy_function(request):
-    """
-    Cloud Function entry point for Google Cloud Functions.
-    This function is called by the functions-framework.
-    """
-    try:
-        # Use controller to handle business logic directly
-        response_data, status_code = validation_controller.validate_and_proxy()
-        
-        # Use view to format response
-        return response_view.create_response(response_data, status_code)
-        
-    except Exception as e:
-        logging.exception("Unexpected error in validate_and_proxy_function")
-        error_response = response_view.format_error_response(
-            "Internal server error", 
-            detail=str(e)
-        )
-        return response_view.create_response(error_response, 500)
+        # Debug útil en logs
+        print(f"Upstream resolved URL: {resp.url}")
+        print(f"Response status from upstream: {resp.status_code}")
+        print(f"Response headers from upstream: {dict(resp.headers)}")
+        # (Ojo: si el body es grande o sensible, comenta la siguiente línea)
+        print(f"Response body from upstream: {resp.content!r}")
+
+        out_headers = {"Content-Type": resp.headers.get("Content-Type", "application/json"), **cors}
+        if "Location" in resp.headers:
+            out_headers["Location"] = resp.headers["Location"]
+        return (resp.content, resp.status_code, out_headers)
+
+    except requests.RequestException as e:
+        logging.exception("Proxy error")
+        body = {"error": "Upstream error", "detail": str(e)}
+        return (json.dumps(body), 502, {"Content-Type": "application/json", **cors})
