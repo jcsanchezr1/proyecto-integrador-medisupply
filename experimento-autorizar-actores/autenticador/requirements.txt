@@ -1,0 +1,5 @@
+Flask==3.*
+PyJWT[crypto]==2.*
+cryptography==42.*
+gunicorn==21.*
+requests==2.32.3

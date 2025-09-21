@@ -1,0 +1,64 @@
+services:
+  
+  autenticador:
+    build: ./autenticador
+    container_name: autenticador
+    ports: ["9001:8080"]
+    environment:
+      - JWT_ISS=https://auth.local
+      - JWT_AUD=medisupply
+      - JWT_KID=dev-kid-1
+    volumes:
+      - ./autenticador/keys:/app/keys   # opcional: monta llaves si las tienes
+
+  historial-service:
+    build: ./historial-service
+    container_name: historial-service
+    ports: ["9003:8080"]
+
+  autorizador:
+    build: ./autorizador
+    container_name: autorizador
+    ports: ["9002:8080"]
+    environment:      
+      - JWT_ISS=http://localhost:9080/realms/medisupply
+      - JWKS_URL=http://keycloak:8080/realms/medisupply/protocol/openid-connect/certs
+      - JWT_AUD=medisupply-client
+      - HISTORIAL_BASE=http://historial-service:8080
+    depends_on: [historial-service]
+  
+  gateway:
+    image: nginx:alpine
+    container_name: api-gateway-local
+    ports: ["9000:80"]
+    volumes:
+      - ./api-gateway/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on: [autenticador, autorizador]
+  
+  kc-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+    volumes:
+      - kcdata:/var/lib/postgresql/data
+    ports: ["9432:5432"]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    command: ["start-dev"]  # modo dev; para prod usa 'start' + hostname/proxy
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+      KC_DB_URL: jdbc:postgresql://kc-db:5432/keycloak
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_PORT: "8080"
+    depends_on: [kc-db]
+    ports: ["9080:8080"]
+
+volumes:
+  kcdata:

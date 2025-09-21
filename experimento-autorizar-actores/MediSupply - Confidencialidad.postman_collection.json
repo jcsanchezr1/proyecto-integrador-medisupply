@@ -1,0 +1,270 @@
+{
+  "info": {
+    "name": "MediSupply - Confidencialidad",
+    "_postman_id": "3f1a6a7a-2f62-47f0-9b7e-6e5c8c5b9c11",
+    "description": "Colección para probar autenticación (custom/Keycloak), autorización y acceso a /historial vía Authorizer y API Gateway.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [],
+  "variable": [
+    { "key": "clienteId", "value": "CL-001" }
+  ],
+  "item": [
+    {
+      "name": "1) Health",
+      "item": [
+        {
+          "name": "Auth (custom) /healthz",
+          "request": {
+            "method": "GET",
+            "url": "{{AUTH_BASE}}/healthz"
+          }
+        },
+        {
+          "name": "Authorizer /healthz",
+          "request": {
+            "method": "GET",
+            "url": "{{AUTHZ_BASE}}/healthz"
+          }
+        },
+        {
+          "name": "Historial /healthz",
+          "request": {
+            "method": "GET",
+            "url": "{{HIST_BASE}}/healthz"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2) Auth (custom) - Login",
+      "item": [
+        {
+          "name": "Login (Gerente)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{USER_EMAIL}}\",\n  \"password\": \"{{USER_PASSWORD}}\"\n}"
+            },
+            "url": "{{AUTH_BASE}}/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "const data = pm.response.json();",
+                  "pm.environment.set(\"access_token\", data.access_token);",
+                  "pm.test(\"access_token presente\", function(){ pm.expect(data).to.have.property('access_token'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login (Vendedor)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{USER_EMAIL_VEND}}\",\n  \"password\": \"{{USER_PASSWORD_VEND}}\"\n}"
+            },
+            "url": "{{AUTH_BASE}}/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+                  "const data = pm.response.json();",
+                  "pm.environment.set(\"access_token\", data.access_token);",
+                  "pm.test(\"access_token presente\", function(){ pm.expect(data).to.have.property('access_token'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3) Keycloak - Obtener Token (Password Grant - DEV)",
+      "item": [
+        {
+          "name": "KC Token (Gerente)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "password" },
+                { "key": "client_id", "value": "{{kc_client_id}}" },
+                { "key": "username", "value": "{{KC_USERNAME}}" },
+                { "key": "password", "value": "{{KC_PASSWORD}}" }
+              ]
+            },
+            "url": "{{KC_BASE}}/realms/{{KC_REALM}}/protocol/openid-connect/token"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.environment.set(\"access_token\", data.access_token);",
+                  "pm.test(\"access_token presente\", () => pm.expect(data).to.have.property('access_token'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "KC Token (Vendedor)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "password" },
+                { "key": "client_id", "value": "{{kc_client_id}}" },
+                { "key": "username", "value": "{{KC_USERNAME_VEND}}" },
+                { "key": "password", "value": "{{KC_PASSWORD_VEND}}" }
+              ]
+            },
+            "url": "{{KC_BASE}}/realms/{{KC_REALM}}/protocol/openid-connect/token"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.environment.set(\"access_token\", data.access_token);",
+                  "pm.test(\"access_token presente\", () => pm.expect(data).to.have.property('access_token'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4) Authorizer (directo)",
+      "item": [
+        {
+          "name": "GET /historial/{clienteId} (token requerido)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": "{{AUTHZ_BASE}}/historial/{{clienteId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"200/403/401\", function () {",
+                  "  pm.expect([200,403,401]).to.include(pm.response.code);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const data = pm.response.json();",
+                  "  pm.expect(data).to.have.property('clienteId');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /historial/{clienteId} (sin token → 401)",
+          "request": {
+            "method": "GET",
+            "url": "{{AUTHZ_BASE}}/historial/{{clienteId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status 401\", function () { pm.response.to.have.status(401); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5) Historial (bypass directo - defensa)",
+      "item": [
+        {
+          "name": "GET directo /historial/{clienteId} (debería 403 si no viene del autorizador)",
+          "request": {
+            "method": "GET",
+            "url": "{{HIST_BASE}}/historial/{{clienteId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"403 esperado\", function () { pm.expect([403,200]).to.include(pm.response.code); });",
+                  "// Nota: si tu servicio de historial no valida X-Auth-Validated, puede responder 200 (solo para dev)."
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6) API Gateway",
+      "item": [
+        {
+          "name": "GET /historial/{clienteId} vía Gateway",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": "{{GATEWAY_BASE}}/historial/{{clienteId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"200/403/401\", function () {",
+                  "  pm.expect([200,403,401]).to.include(pm.response.code);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

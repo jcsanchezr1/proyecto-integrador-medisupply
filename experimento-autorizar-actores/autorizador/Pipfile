@@ -1,0 +1,15 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+flask = "==3.0.3"
+pyjwt = {extras = ["crypto"], version = "==2.9.0"}
+requests = "==2.32.3"
+python-dotenv = "==1.0.1"
+
+[dev-packages]
+
+[requires]
+python_version = "3.12"

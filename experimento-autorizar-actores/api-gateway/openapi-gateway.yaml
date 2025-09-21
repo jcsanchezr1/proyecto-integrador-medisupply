@@ -1,0 +1,60 @@
+swagger: '2.0'
+info:
+  title: MediSupply – Gateway Autenticación/Autorización
+  version: 1.0.0
+
+schemes:
+  - https
+consumes:
+  - application/json
+produces:
+  - application/json
+
+paths:
+  /auth/token:
+    post:
+      summary: Proxy a Autenticador (/token)
+      operationId: postAuthToken
+      x-google-backend:
+        # Opción A: tu backend real es /token (no agregar /auth/token)
+        address: https://autenticador-czl6jx3zfa-uc.a.run.app/token
+        path_translation: CONSTANT_ADDRESS
+        disable_auth: true
+      responses:
+        '200':
+          description: OK
+
+  /historial/{clienteId}:
+    # Declarar el parámetro a nivel de path para que lo vean GET y OPTIONS
+    parameters:
+      - name: clienteId
+        in: path
+        required: true
+        type: string
+
+    get:
+      summary: Proxy a Autorizador (pasa Authorization intacto)
+      operationId: getHistorial
+      x-google-backend:
+        address: https://autorizador-czl6jx3zfa-uc.a.run.app
+        path_translation: APPEND_PATH_TO_ADDRESS
+        disable_auth: true
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '404':
+          description: Not Found
+
+    options:
+      summary: CORS preflight a Autorizador
+      operationId: optionsHistorial
+      x-google-backend:
+        address: https://autorizador-czl6jx3zfa-uc.a.run.app
+        path_translation: APPEND_PATH_TO_ADDRESS
+      responses:
+        '204':
+          description: No Content
